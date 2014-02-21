@@ -1,7 +1,7 @@
 # A sample Gemfile
 source "https://rubygems.org"
 
-gem 'kafka'
+gem 'poseidon'
 gem 'mongo'
 gem 'bson'
 gem 'aws-sdk'
