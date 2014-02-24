@@ -35,6 +35,18 @@ if delete
   `mongorestore --db #{project} #{project}_#{date}/`
 end
 
+def debsonify(hash)
+  hash.each do |key, value|
+    if key =~ /_ids/
+      hash[key] = value.map{|id| id.to_s}
+    elsif key =~ /_id/
+      hash[key] = value.to_s
+    elsif value.is_a?(Hash) || value.is_a?(Array)
+      hash[key] = debsonify(value)
+    end
+  end
+end
+
 kafka_prod = Poseidon::Producer.new(brokers, "mongo_kafka")
 
 client = Mongo::MongoClient.new('localhost', '27017')
@@ -42,8 +54,8 @@ cs = client[project]["#{project}_classifications"]
 
 cs.find({}, :timeout => false) do |cursor|
   cursor.each do |doc|
+    debsonify(doc)
     doc['project_name'] = project
-    sleep(1)
     kafka_prod.send_messages([Poseidon::MessageToSend.new("classifications_#{project}", doc.to_json)])
   end
 end
