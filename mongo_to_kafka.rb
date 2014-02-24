@@ -11,8 +11,6 @@ project = ARGV[0]
 brokers = ARGV[1].split(',')
 delete = !(ARGV[2] == "false")
 
-p project, brokers, delete
-
 # Download Database
 date = `date +%Y-%m-%d`.chomp
 
