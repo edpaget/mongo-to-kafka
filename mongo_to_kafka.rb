@@ -46,16 +46,40 @@ def debsonify(hash)
   end
 end
 
+def format (hash, project)
+  c = {
+    id: hash["_id"],
+    project: project,
+    subject: hash["subjects"],
+    timestamp: hash["created_at"],
+    user_ip: hash["user_ip"]
+  }
+
+  unless hash["user_name"].nil?
+    c[:user] = hash["user_name"]
+    c[:user_id] = hash["user_id"]
+  end
+
+  return c
+end
+
+
 kafka_prod = Poseidon::Producer.new(brokers, "mongo_kafka")
 
 client = Mongo::MongoClient.new('localhost', '27017')
 cs = client[project]["#{project}_classifications"]
 
+count = File.read(".offset").to_i || 0
+
 cs.find({}, :timeout => false) do |cursor|
+  cursor.skip(count) unless count == 0
+
   cursor.each do |doc|
     debsonify(doc)
-    doc['project_name'] = project
+    doc = format(doc, project)
     kafka_prod.send_messages([Poseidon::MessageToSend.new("classifications_#{project}", doc.to_json)])
+    count += 1
+    File.open(".offset", "w") { |f| f.write(count.to_i) }
   end
 end
 
