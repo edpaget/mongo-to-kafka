@@ -19,9 +19,6 @@ if download
   AWS.config(access_key_id: ENV['S3_ACCESS_ID'], secret_access_key: ENV['S3_SECRET_KEY'])
   s3 = AWS::S3.new
   bucket = s3.buckets['zooniverse-code']
-  p bucket
-  p date
-  p "databases/#{date}/ouroboros_projects/#{project}_#{date}.tar.gz"
   obj = bucket.objects["databases/#{date}/ouroboros_projects/#{project}_#{date}.tar.gz"]
 
   File.open("dump.tar.gz", "wb") do |file|
@@ -47,12 +44,15 @@ def debsonify(hash)
 end
 
 def format (hash, project)
+  subjects = hash["subjects"].map{|s| s["_id"]}
+  subjects = hash["subject_ids"] if subjects.empty?
   c = {
     id: hash["_id"],
     project: project,
-    subject: hash["subjects"],
+    subjects: subjects,
     timestamp: hash["created_at"],
-    user_ip: hash["user_ip"]
+    user_ip: hash["user_ip"],
+    annotations: hash["annotations"]
   }
 
   unless hash["user_name"].nil?
@@ -62,7 +62,6 @@ def format (hash, project)
 
   return c
 end
-
 
 kafka_prod = Poseidon::Producer.new(brokers, "mongo_kafka")
 
@@ -77,7 +76,7 @@ cs.find({}, :timeout => false) do |cursor|
   cursor.each do |doc|
     debsonify(doc)
     doc = format(doc, project)
-    kafka_prod.send_messages([Poseidon::MessageToSend.new("classifications_#{project}", doc.to_json)])
+    kafka_prod.send_messages([Poseidon::MessageToSend.new("classifications", doc.to_json)])
     count += 1
     File.open(".offset", "w") { |f| f.write(count.to_i) }
   end
