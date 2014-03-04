@@ -1,2 +1,6 @@
 .env
 .rvmrc
+.offset
+.ruby-version
+dump.tar.gz
+wise_2014-03-02
