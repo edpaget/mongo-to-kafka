@@ -45,7 +45,8 @@ end
 
 def format (hash, project)
   subjects = hash["subjects"].map{|s| s["_id"]}
-  subjects = hash["subject_ids"] if subjects.empty?
+  subjects = hash["subject_ids"] if subjects.empty? || subjects.first.nil?
+
   c = {
     id: hash["_id"],
     project: project,
@@ -68,7 +69,7 @@ kafka_prod = Poseidon::Producer.new(brokers, "mongo_kafka")
 client = Mongo::MongoClient.new('localhost', '27017')
 cs = client[project]["#{project}_classifications"]
 
-count = File.read(".offset").to_i || 0
+count = 0
 
 cs.find({}, :timeout => false) do |cursor|
   cursor.skip(count) unless count == 0
@@ -76,9 +77,10 @@ cs.find({}, :timeout => false) do |cursor|
   cursor.each do |doc|
     debsonify(doc)
     doc = format(doc, project)
-    kafka_prod.send_messages([Poseidon::MessageToSend.new("classifications", doc.to_json)])
+    suc = kafka_prod.send_messages([Poseidon::MessageToSend.new("classifications", doc.to_json)])
+    break unless suc
     count += 1
-    File.open(".offset", "w") { |f| f.write(count.to_i) }
+#    break if count > 1000
   end
 end
 
